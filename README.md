@@ -69,7 +69,7 @@ Always 1 word.
 | Code | Name                 | Example          |
 |------|----------------------|------------------|
 | 0    | Register             | ADD R1, R2       |
-| 1    | Immediate            | MOV R5, #100     |
+| 1    | Immediate            | MOV R5, #100   |
 | 2    | Direct               | LOAD R3, [0x100] |
 | 3    | Indirect register    | LOAD R3, [R2]    |
 
@@ -91,44 +91,59 @@ Always 1 word.
 
 ## Memory
 
-- imem: list of numbers, size ~4096
-- dmem: list of numbers, size ~4096
+- imem: list of 4096 numbers
+- dmem: list of 4096 numbers
+- Registers initialized to 0
 - First cell of array holds its size N
-- Then N elements
+- Array elements start at address start + 1
+- Array A base: 0x100
+- Array B base: 0x200
+- Result of convolution: 0x300 (low word), 0x301 (high word)
+- Result of maximum: 0x200
 
 ## CPU Interface
 
-cpu.step()          # execute one command
-cpu.reset()         # reset
-cpu.regs            # list [16]
-cpu.imem            # list [N]
-cpu.dmem            # list [N]
-cpu.pc              # program counter
-cpu.ir              # instruction register
+cpu.step()           # execute one command
+cpu.run(limit=10000) # execute until HALT or limit reached
+cpu.reset()          # reset
+cpu.regs             # list [16]
+cpu.imem             # list [N]
+cpu.dmem             # list [N]
+cpu.pc               # program counter
+cpu.ir               # instruction register
 cpu.ZF, cpu.CF, cpu.SF
 
 ## Encoding Examples
 
-```asm
-ADD R1, R2
-opcode=3, Rd=1, Rs=2, mode=0
-0x3120
+    ADD R1, R2
+    opcode=3, Rd=1, Rs=2, mode=0
+    0x3120
 
-MOV R5, #100
-word 1: opcode=0, Rd=5, Rs=0, mode=1 -> 0x0501
-word 2: 0x0064
+    MOV R5, #100
+    word 1: opcode=0, Rd=5, Rs=0, mode=1 -> 0x0501
+    word 2: 0x0064
 
-STORE [0x100], R3
-word 1: opcode=2, Rd=3, Rs=0, mode=2 -> 0x2302
-word 2: 0x0100
-```
+    STORE [0x100], R3
+    word 1: opcode=2, Rd=3, Rs=0, mode=2 -> 0x2302
+    word 2: 0x0100
+
+## Edge Cases
+
+- Division by zero: raise exception
+- MUL carry: low word -> Rd, high word -> Rd+1, CF unchanged
+- After HALT: cpu.halted = True, run() stops
+
+## Output Format
+
+- All values displayed in hex with 0x prefix
+- Example: 0x3120
 
 ## Work Division
 
 ### CPU core
 
 - fields: imem, dmem, regs[16], pc, ir, ZF, CF, SF
-- step(), reset()
+- step(), run(), reset()
 - decoder via bit shifts
 - handle commands of length 1 and 2 words
 - update flags after arithmetic
