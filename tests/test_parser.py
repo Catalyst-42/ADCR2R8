@@ -36,8 +36,9 @@ loop:   INC R0
         HALT
     """
     words = assemble_source(src, mem_size=None)
-    # MOV R0,#0 (2) + INC R0 (1) + CMP R0,#3 (2) + JNZ loop (1) + HALT (1) = 7
-    assert len(words) == 7
+    # MOV R0,#0 (2) + INC R0 (1) + CMP R0,#3 (2) + JNZ loop (2) + HALT (1) = 8
+    assert len(words) == 8
+    assert words[5:] == [0x002F, 2, 0x007F]
 
 
 def test_undefined_label_raises():
@@ -62,7 +63,7 @@ def test_convolution_assembles_cleanly():
 def test_padding_to_mem_size():
     words = assemble_source("HALT", mem_size=4096)
     assert len(words) == 4096
-    assert words[0] == 0x7000
+    assert words[0] == 0x007F
     assert all(w == 0 for w in words[1:])
 
 
@@ -74,3 +75,9 @@ if __name__ == "__main__":
     test_convolution_assembles_cleanly()
     test_padding_to_mem_size()
     print("All tests passed.")
+
+# Standard-library discovery, also retaining pytest-compatible functions.
+def load_tests(loader, tests, pattern):
+    import unittest
+    return unittest.TestSuite(unittest.FunctionTestCase(value) for name, value in globals().items()
+                              if name.startswith('test_') and callable(value))
