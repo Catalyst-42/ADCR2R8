@@ -1,7 +1,25 @@
 """Independent 16-bit Harvard CPU. Binary/API contract: docs/core.md."""
+
+from collections.abc import Iterable
 from dataclasses import dataclass
-from src.cpu.constants import (CONTROL_TAG, DATA_OPCODES, DMEM_SIZE, IMEM_SIZE,
-                               JUMP_OPCODES, NUM_REGISTERS, WORD_MASK)
+
+from src.cpu.constants import (
+    CONTROL_TAG,
+    DATA_OPCODES,
+    DMEM_SIZE,
+    IMEM_SIZE,
+    JUMP_OPCODES,
+    MODE_DIRECT,
+    MODE_IMMEDIATE,
+    MODE_INDIRECT,
+    MODE_REGISTER,
+    NUM_REGISTERS,
+    SINGLE_OPERAND,
+    WORD_MASK,
+)
+
+_DATA_MNEMONICS = {code: name for name, code in DATA_OPCODES.items()}
+_JUMP_MNEMONICS = {code: name for name, code in JUMP_OPCODES.items()}
 
 
 class CPUError(ValueError):
@@ -20,48 +38,55 @@ class DecodedInstruction:
     operand: int | None = None
 
     @property
-    def assembly(self):
+    def assembly(self) -> str:
         if self.mnemonic == 'HALT':
             return 'HALT'
         if self.mnemonic in JUMP_OPCODES:
             return f'{self.mnemonic} 0x{self.operand:03X}'
-        if self.mnemonic in {'INC', 'DEC', 'NOT'}:
+        if self.mnemonic in SINGLE_OPERAND:
             return f'{self.mnemonic} R{self.rd}'
-        source = (f'R{self.rs}' if self.mode == 0 else
-                  f'#0x{self.operand:04X}' if self.mode == 1 else
-                  f'[0x{self.operand:03X}]' if self.mode == 2 else
-                  f'[R{self.rs}]')
-        operands = f'{source}, R{self.rd}' if self.mnemonic == 'STORE' else f'R{self.rd}, {source}'
+        if self.mode == MODE_REGISTER:
+            source = f'R{self.rs}'
+        elif self.mode == MODE_IMMEDIATE:
+            source = f'#0x{self.operand:04X}'
+        elif self.mode == MODE_DIRECT:
+            source = f'[0x{self.operand:03X}]'
+        else:
+            source = f'[R{self.rs}]'
+        operands = f'R{self.rd}, {source}'
+        if self.mnemonic == 'STORE':
+            operands = f'{source}, R{self.rd}'
         return f'{self.mnemonic} {operands}'
 
 
 class CPU:
-    def __init__(self):
+    def __init__(self) -> None:
         self.imem = [0] * IMEM_SIZE
         self.dmem = [0] * DMEM_SIZE
         self.regs = [0] * NUM_REGISTERS
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset execution state; retain program and data memory."""
         self.regs[:] = [0] * NUM_REGISTERS
         self.pc = self.ir = 0
-        self.ZF = self.CF = self.SF = self.halted = False
+        self.ZF = self.CF = self.SF = False
+        self.halted = False
         self.last_instruction = None
 
     @staticmethod
-    def _word(value):
+    def _word(value: int) -> int:
         if type(value) is not int or not 0 <= value <= WORD_MASK:
             raise CPUError(f'Expected a 16-bit unsigned integer, got {value!r}')
         return value
 
     @staticmethod
-    def _address(value, size):
+    def _address(value: int, size: int) -> int:
         if type(value) is not int or not 0 <= value < size:
             raise CPUError(f'Address {value!r} outside memory of {size} words')
         return value
 
-    def load_program(self, words):
+    def load_program(self, words: Iterable[int]) -> None:
         """Validate, copy, clear unused imem and reset execution (retain dmem)."""
         words = list(words)
         if len(words) > IMEM_SIZE:
@@ -71,8 +96,8 @@ class CPU:
         self.imem[:] = words + [0] * (IMEM_SIZE - len(words))
         self.reset()
 
-    def load_data(self, address, values):
-        """Atomically initialize data memory for GUI input and test arrays."""
+    def load_data(self, address: int, values: Iterable[int]) -> None:
+        """Validate the entire block before writing to data memory."""
         self._address(address, DMEM_SIZE)
         values = list(values)
         if address + len(values) > DMEM_SIZE:
@@ -83,42 +108,67 @@ class CPU:
 
     def snapshot(self):
         """Detached state for GUI; editing it cannot alter the CPU."""
-        return dict(regs=self.regs.copy(), imem=self.imem.copy(), dmem=self.dmem.copy(),
-                    pc=self.pc, ir=self.ir, ZF=self.ZF, CF=self.CF, SF=self.SF,
-                    halted=self.halted, last_instruction=self.last_instruction)
+        return {
+            'regs': self.regs.copy(),
+            'imem': self.imem.copy(),
+            'dmem': self.dmem.copy(),
+            'pc': self.pc,
+            'ir': self.ir,
+            'ZF': self.ZF,
+            'CF': self.CF,
+            'SF': self.SF,
+            'halted': self.halted,
+            'last_instruction': self.last_instruction,
+        }
 
-    def decode(self, address=None):
+    def decode(self, address: int | None = None) -> DecodedInstruction:
         """Decode without executing. Addresses and lengths are in 16-bit words."""
         address = self.pc if address is None else address
         word = self._word(self.imem[self._address(address, IMEM_SIZE)])
-        mode = word & 15
-        rd, rs = (word >> 8) & 15, (word >> 4) & 15
+        mode = word & 0xF
+        rd, rs = (word >> 8) & 0xF, (word >> 4) & 0xF
         if mode == CONTROL_TAG:
-            if word >> 8 or rs not in JUMP_OPCODES.values():
+            if word >> 8 or rs not in _JUMP_MNEMONICS:
                 raise CPUError(f'Invalid control instruction 0x{word:04X}')
-            name = next(n for n, code in JUMP_OPCODES.items() if code == rs)
+            name = _JUMP_MNEMONICS[rs]
             length = 1 if name == 'HALT' else 2
         else:
-            if mode > 3:
+            if mode not in {MODE_REGISTER, MODE_IMMEDIATE, MODE_DIRECT, MODE_INDIRECT}:
                 raise CPUError(f'Invalid addressing mode {mode}')
-            name = next(n for n, code in DATA_OPCODES.items() if code == word >> 12)
-            if name in {'INC', 'DEC', 'NOT'} and (mode != 0 or rs != 0):
+            name = _DATA_MNEMONICS[word >> 12]
+            if name in SINGLE_OPERAND and (mode != MODE_REGISTER or rs != 0):
                 raise CPUError(f'{name} requires mode 0 and an unused Rs field')
-            if name in {'LOAD', 'STORE'} and mode not in {2, 3}:
+            if name in {'LOAD', 'STORE'} and mode not in {MODE_DIRECT, MODE_INDIRECT}:
                 raise CPUError(f'{name} requires memory addressing')
-            if mode in {1, 2} and rs != 0:
+            if mode in {MODE_IMMEDIATE, MODE_DIRECT} and rs != 0:
                 raise CPUError('Unused Rs field must be zero')
             if name == 'MUL' and rd == NUM_REGISTERS - 1:
                 raise CPUError('MUL R15 has no high-result register R16')
-            length = 2 if mode in {1, 2} else 1
+            length = 2 if mode in {MODE_IMMEDIATE, MODE_DIRECT} else 1
         operand = None
         if length == 2:
             operand = self._word(self.imem[self._address(address + 1, IMEM_SIZE)])
-            if name in JUMP_OPCODES or mode == 2:
-                self._address(operand, IMEM_SIZE if name in JUMP_OPCODES else DMEM_SIZE)
+            if name in JUMP_OPCODES:
+                self._address(operand, IMEM_SIZE)
+            elif mode == MODE_DIRECT:
+                self._address(operand, DMEM_SIZE)
         return DecodedInstruction(address, word, name, length, rd, rs, mode, operand)
 
-    def step(self):
+    def _memory_address(self, instruction: DecodedInstruction) -> int:
+        if instruction.mode == MODE_DIRECT:
+            address = instruction.operand
+        else:
+            address = self.regs[instruction.rs]
+        return self._address(address, DMEM_SIZE)
+
+    def _read_operand(self, instruction: DecodedInstruction) -> int:
+        if instruction.mode == MODE_REGISTER:
+            return self._word(self.regs[instruction.rs])
+        if instruction.mode == MODE_IMMEDIATE:
+            return instruction.operand
+        return self._word(self.dmem[self._memory_address(instruction)])
+
+    def step(self) -> DecodedInstruction | None:
         """Execute one instruction; return its decode, or None after HALT.
 
         Execution faults preserve all state, including PC, IR and flags.
@@ -131,28 +181,36 @@ class CPU:
         result = high = store_address = None
         zf, cf, sf = self.ZF, self.CF, self.SF
         if name in JUMP_OPCODES:
-            conditions = dict(JMP=True, JZ=self.ZF, JNZ=not self.ZF,
-                              JC=self.CF, JNC=not self.CF, JS=self.SF, JNS=not self.SF)
-            if name != 'HALT' and conditions[name]:
+            conditions = {
+                'JMP': True,
+                'JZ': self.ZF,
+                'JNZ': not self.ZF,
+                'JC': self.CF,
+                'JNC': not self.CF,
+                'JS': self.SF,
+                'JNS': not self.SF,
+                'HALT': False,
+            }
+            if conditions[name]:
                 next_pc = ins.operand
+        elif name == 'STORE':
+            store_address = self._memory_address(ins)
+            store_value = self._word(self.regs[rd])
+        elif name in {'MOV', 'LOAD'}:
+            result = self._read_operand(ins)
         else:
             a = self._word(self.regs[rd])
-            if ins.mode in {2, 3}:
-                address = ins.operand if ins.mode == 2 else self.regs[ins.rs]
-                self._address(address, DMEM_SIZE)
-                b = self._word(self.dmem[address]) if name != 'STORE' else 0
-            else:
-                b = ins.operand if ins.mode == 1 else self._word(self.regs[ins.rs])
-            if name == 'STORE':
-                store_address = address
-            elif name in {'MOV', 'LOAD'}:
-                result = b
-            elif name in {'ADD', 'ADC', 'INC'}:
-                raw = a + (1 if name == 'INC' else b) + (int(cf) if name == 'ADC' else 0)
+            b = None if name in SINGLE_OPERAND else self._read_operand(ins)
+            if name in {'ADD', 'ADC', 'INC'}:
+                raw = a + (1 if name == 'INC' else b)
+                if name == 'ADC':
+                    raw += int(cf)
                 result = raw & WORD_MASK
                 cf = raw > WORD_MASK
             elif name in {'SUB', 'SBB', 'CMP', 'DEC'}:
-                raw = a - (1 if name == 'DEC' else b) - (int(cf) if name == 'SBB' else 0)
+                raw = a - (1 if name == 'DEC' else b)
+                if name == 'SBB':
+                    raw -= int(cf)
                 result = raw & WORD_MASK
                 cf = raw < 0
             elif name == 'MUL':
@@ -163,16 +221,23 @@ class CPU:
                     raise ZeroDivisionError(f'DIV by zero at PC=0x{self.pc:03X}')
                 result, cf = a // b, False
             else:
-                result = {'AND': lambda: a & b, 'OR': lambda: a | b,
-                          'XOR': lambda: a ^ b, 'NOT': lambda: (~a) & WORD_MASK}[name]()
+                if name == 'AND':
+                    result = a & b
+                elif name == 'OR':
+                    result = a | b
+                elif name == 'XOR':
+                    result = a ^ b
+                elif name == 'NOT':
+                    result = (~a) & WORD_MASK
+                else:
+                    raise CPUError(f'Unsupported instruction {name}')
                 cf = False
-            if name not in {'MOV', 'LOAD', 'STORE'}:
-                zf = (raw == 0) if name == 'MUL' else result == 0
-                sf = bool((high if name == 'MUL' else result) & 0x8000)
+            zf = (raw == 0) if name == 'MUL' else result == 0
+            sf = bool((high if name == 'MUL' else result) & 0x8000)
 
         # Commit only after every fallible operation has completed.
         if store_address is not None:
-            self.dmem[store_address] = a
+            self.dmem[store_address] = store_value
         if result is not None and name != 'CMP':
             self.regs[rd] = result
         if high is not None:
@@ -183,7 +248,7 @@ class CPU:
         self.last_instruction = ins
         return ins
 
-    def run(self, limit=10000):
+    def run(self, limit: int = 10000) -> int:
         """Run at most limit instructions; return count. Resume with another call."""
         if type(limit) is not int or limit < 0:
             raise CPUError('Run limit must be a non-negative integer')

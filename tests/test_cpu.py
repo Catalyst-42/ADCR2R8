@@ -1,7 +1,11 @@
 """Run all core and parser tests with python -m unittest discover -s tests -v."""
 import random
+import sys
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from src.cpu.cpu import CPU, CPUError
 from src.assembler.parser import assemble_source, assemble_file
 from src.assembler.errors import AsmError
@@ -74,6 +78,32 @@ class CoreTests(unittest.TestCase):
                 c.step()
                 self.assertEqual(c.regs[rd:rd+2], [1, 65534])
                 self.assertEqual((c.CF, c.ZF, c.SF), (carry, False, True))
+
+    def test_multiply_flags_use_the_full_product(self):
+        for a, b, words, zero in [
+            (256, 256, [0, 1], False),
+            (0, 65535, [0, 0], True),
+        ]:
+            with self.subTest(a=a, b=b):
+                cpu = self.cpu('MUL R0, R1')
+                cpu.regs[:2] = [a, b]
+                cpu.step()
+                self.assertEqual(cpu.regs[:2], words)
+                self.assertEqual((cpu.ZF, cpu.SF), (zero, False))
+
+    def test_indirect_address_uses_register_before_write(self):
+        for source, expected in [
+            ('LOAD R1, [R1]', 42),
+            ('ADD R1, [R1]', 142),
+            ('STORE [R1], R1', 100),
+        ]:
+            with self.subTest(source=source):
+                cpu = self.cpu(source)
+                cpu.regs[1] = 100
+                cpu.load_data(100, [42])
+                cpu.step()
+                result = cpu.dmem[100] if source.startswith('STORE') else cpu.regs[1]
+                self.assertEqual(result, expected)
 
     def test_moves_preserve_flags(self):
         c = self.cpu('MOV R0, #4\nSTORE [100], R0\nLOAD R1, [100]\nHALT')
