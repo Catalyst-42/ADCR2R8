@@ -1,5 +1,13 @@
 # ADCR2R8
 
+Implemented core and integration contract (Russian): [docs/core.md](docs/core.md).
+
+Run headless examples: `python -m src.cpu.demo`
+
+Run tests (no dependencies): `python -m unittest discover -s tests -v`
+
+GUI is currently a placeholder.
+
 ## General Information
 
 - Architecture: Harvard (separate imem and dmem)
@@ -25,10 +33,15 @@
 
 ### Jumps (separate format)
 
-    [15:12] [11:0]
-    opcode   address
+    word 1: 0x00cF (c is the condition code below)
+    word 2: absolute target address, 0..4095
 
-Always 1 word.
+Jumps take 2 words. HALT is one word: 0x007F.
+This replaces the old ambiguous encoding that collided with data instructions.
+Reassemble old machine-code lists.
+
+The project retains variable-length instructions; the attached example requirements
+request fixed length. See docs/core.md for this outstanding specification difference.
 
 ## Opcode Table
 
@@ -98,7 +111,7 @@ Always 1 word.
 - Array elements start at address start + 1
 - Array A base: 0x100
 - Array B base: 0x200
-- Result of convolution: 0x300 (low word), 0x301 (high word)
+- Result of convolution: 0x300 (low word), 0x301 (middle word), 0x302 (high word)
 - Result of maximum: 0x200
 
 ## CPU Interface

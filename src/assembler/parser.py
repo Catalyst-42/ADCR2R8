@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from src.assembler.errors import AsmError
 from src.cpu.constants import (
     ADDR12_MASK,
+    CONTROL_TAG,
     DATA_OPCODES,
     IMEM_SIZE,
     JUMP_OPCODES,
@@ -151,7 +152,7 @@ def tokenize_line(raw_line: str, line_no: int):
 
 def instruction_length(mnemonic: str, operands: list[Operand], line_no: int) -> int:
     if mnemonic in JUMP_OPCODES:
-        return 1
+        return 1 if mnemonic == "HALT" else 2
 
     if mnemonic not in DATA_OPCODES:
         raise AsmError(f"unknown mnemonic '{mnemonic}'", line_no)
@@ -212,7 +213,9 @@ def resolve(value, labels: dict[str, int], line_no: int) -> int:
 def encode_jump(instr: Instruction, labels: dict[str, int]) -> list[int]:
     opcode = JUMP_OPCODES[instr.mnemonic]
     if instr.mnemonic == "HALT":
-        addr = 0
+        if instr.operands:
+            raise AsmError("HALT expects no operands", instr.line_no)
+        return [CONTROL_TAG | (opcode << 4)]
     else:
         if len(instr.operands) != 1:
             raise AsmError(
@@ -228,8 +231,7 @@ def encode_jump(instr: Instruction, labels: dict[str, int]) -> list[int]:
         addr = resolve(op.value, labels, instr.line_no)
     if addr > ADDR12_MASK:
         raise AsmError(f"jump target 0x{addr:X} does not fit in 12 bits", instr.line_no)
-    word = (opcode << 12) | (addr & ADDR12_MASK)
-    return [word & WORD_MASK]
+    return [CONTROL_TAG | (opcode << 4), addr]
 
 
 def encode_data(instr: Instruction, labels: dict[str, int]) -> list[int]:
@@ -247,6 +249,13 @@ def encode_data(instr: Instruction, labels: dict[str, int]) -> list[int]:
             f"'{instr.mnemonic}' expects 2 operands, got {len(instr.operands)}",
             instr.line_no,
         )
+
+    if instr.mnemonic == "MUL" and instr.operands[0].value == 15:
+        raise AsmError("MUL R15 has no high-result register R16", instr.line_no)
+
+    memory_operand = instr.operands[0] if instr.mnemonic == "STORE" else instr.operands[1]
+    if instr.mnemonic in {"LOAD", "STORE"} and memory_operand.kind not in {"direct", "indirect"}:
+        raise AsmError(f"{instr.mnemonic} requires memory addressing", instr.line_no)
 
     if instr.mnemonic in REVERSED_OPERANDS:
         # e.g. STORE [addr]/[Rs], Rd
@@ -288,6 +297,8 @@ def _encode_with_mode(
 
     if mode_op.kind == "direct":
         addr = resolve(mode_op.value, labels, line_no)
+        if addr > ADDR12_MASK:
+            raise AsmError("data address exceeds 4095", line_no)
         word1 = (opcode << 12) | (rd << 8) | (0 << 4) | MODE_DIRECT
         return [word1 & WORD_MASK, addr & WORD_MASK]
 

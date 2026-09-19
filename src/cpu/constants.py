@@ -42,7 +42,8 @@ MODE_IMMEDIATE = 1  # MOV R5, #100
 MODE_DIRECT = 2  # LOAD R3, [0x100]
 MODE_INDIRECT = 3  # LOAD R3, [R2]
 
-# Jumps: [15:12] opcode  [11:0] address  (always 1 word)
+# Control escape: 0x00cF, followed by a 12-bit target word; HALT has no target.
+CONTROL_TAG = 0x000F
 JUMP_OPCODES = {
     "JMP": 0x0,
     "JZ": 0x1,
@@ -66,3 +67,6 @@ ARRAY_B_BASE = 0x200
 MAX_RESULT_ADDR = 0x200
 CONV_RESULT_LOW_ADDR = 0x300
 CONV_RESULT_HIGH_ADDR = 0x301
+
+# Third result word prevents overflow when adding six 32-bit products.
+CONV_RESULT_TOP_ADDR = 0x302
