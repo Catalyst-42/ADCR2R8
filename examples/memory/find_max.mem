@@ -1,7 +1,7 @@
 ; Number of elements in array
 0x0001:6
 
-; Array
+; Array itself
 0x0002:5
 0x0003:45
 0x0004:99

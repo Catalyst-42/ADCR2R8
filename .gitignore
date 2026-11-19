@@ -1,3 +1,4 @@
 .venv
 .DS_Store
+.mcp.json
 __pycache__

@@ -166,14 +166,20 @@ class MemoryView(ttk.Frame):
         omitting it refreshes the complete memory view.
         """
         selected = range(min(len(memory), 4096)) if addresses is None else addresses
+        if not selected:
+            return
+            
+        # Precompute values for better performance
         for address in selected:
             if 0 <= address < len(memory) and address < 4096:
-                hex_value = to_hex(memory[address])
-                decimal_value = str(memory[address])
-                char_value = self._get_character_representation(memory[address])
+                value = memory[address]
+                hex_value = to_hex(value)  # 0x0000 format
+                decimal_value = str(value)
+                char_value = self._get_character_representation(value)
+                address_str = to_hex(address, 3)  # 0x000 format
                 self.tree.item(
                     str(address),
-                    values=(to_hex(address, 3), hex_value, decimal_value, char_value),
+                    values=(address_str, hex_value, decimal_value, char_value),
                 )
 
     def show_address(self, address: int) -> None:
@@ -230,3 +236,74 @@ class HexView(ttk.Frame):
         self.text.delete("1.0", "end")
         self.text.insert("1.0", "\n".join(lines))
         self.text.configure(state="disabled")
+
+
+class ProgramCommands(ttk.Frame):
+    """Scrollable list showing loaded program commands with addresses."""
+
+    def __init__(self, master: tk.Misc, cpu=None, **kwargs) -> None:
+        super().__init__(master, **kwargs)
+        self.cpu = cpu
+        
+        # Create treeview for program commands
+        self.tree = ttk.Treeview(
+            self,
+            columns=("address", "code", "instruction"),
+            show="headings",
+            height=20,
+            selectmode="browse",
+        )
+        self.tree.heading("address", text="Address")
+        self.tree.heading("code", text="Code")
+        self.tree.heading("instruction", text="Instruction")
+        self.tree.column("address", width=70, anchor="e", stretch=False)
+        self.tree.column("code", width=80, anchor="e", stretch=False)
+        self.tree.column("instruction", width=140, anchor="w", stretch=True)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Grid layout
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        
+        # Configure grid weights
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self, program_memory: Sequence[int], cpu=None) -> None:
+        """Refresh the program commands list from instruction memory."""
+        self.cpu = cpu
+        # Clear existing items
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        # Add program instructions with assembly format
+        for address, instruction in enumerate(program_memory):
+            if instruction != 0:  # Only show non-zero instructions
+                address_str = to_hex(address, 3)  # 0x000 format
+                code_str = to_hex(instruction)  # 0x0000 format (raw hex code)
+                
+                # Try to decode instruction to assembly
+                if self.cpu:
+                    try:
+                        decoded = self.cpu.decode(address)
+                        instruction_str = decoded.assembly
+                    except:
+                        # Fall back to hex if decoding fails
+                        instruction_str = code_str
+                else:
+                    # Fall back to hex if no CPU reference
+                    instruction_str = code_str
+                
+                self.tree.insert("", "end", iid=str(address), 
+                               values=(address_str, code_str, instruction_str))
+
+    def show_address(self, address: int) -> None:
+        """Select and reveal a specific address in the program list."""
+        if 0 <= address < 4096:
+            item = str(address)
+            self.tree.selection_set(item)
+            self.tree.focus(item)
+            self.tree.see(item)
