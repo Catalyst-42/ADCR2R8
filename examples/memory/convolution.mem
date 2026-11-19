@@ -1,0 +1,17 @@
+; Sample memory file for convolution program
+; Format: address:value pairs
+; Using standardized convention: dmem[0x0001]=size, dmem[0x0002+]=arrayA, dmem[0x0002+N+]=arrayB
+
+0x0001:6
+0x0002:10
+0x0003:20
+0x0004:30
+0x0005:40
+0x0006:50
+0x0007:60
+0x0008:1
+0x0009:2
+0x000A:3
+0x000B:4
+0x000C:5
+0x000D:6

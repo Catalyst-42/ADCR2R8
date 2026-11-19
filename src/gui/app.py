@@ -38,13 +38,13 @@ class App(tk.Tk):
         self._refresh(full_memory=True)
 
     def _build_ui(self) -> None:
+        self.title("CPU Emulator")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
-        toolbar = ttk.Frame(self, padding=(8, 8, 8, 4))
-        toolbar.grid(row=0, column=0, sticky="ew")
+        toolbar = ttk.Frame(self)
+        toolbar.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
         toolbar.columnconfigure(8, weight=1)
-
         self.step_button = ttk.Button(toolbar, text="Step", command=self.step)
         self.run_button = ttk.Button(toolbar, text="Run", command=self.start_run)
         self.stop_button = ttk.Button(
@@ -52,9 +52,10 @@ class App(tk.Tk):
         )
         self.reset_button = ttk.Button(toolbar, text="Reset", command=self.reset)
         self.load_button = ttk.Button(toolbar, text="Load .asm", command=self.load)
+        self.load_mem_button = ttk.Button(toolbar, text="Load .mem", command=self.load_mem)
         for column, button in enumerate(
             (self.step_button, self.run_button, self.stop_button,
-             self.reset_button, self.load_button)
+             self.reset_button, self.load_button, self.load_mem_button)
         ):
             button.grid(row=0, column=column, padx=(0, 6))
 
@@ -92,30 +93,19 @@ class App(tk.Tk):
         self.registers = RegisterTable(registers)
         self.registers.grid(row=0, column=0, sticky="nsew")
 
-        output = ttk.LabelFrame(left, text="Hex output", padding=4)
-        output.grid(row=2, column=0, sticky="nsew")
-        output.columnconfigure(0, weight=1)
-        output.rowconfigure(0, weight=1)
-        self.output = HexView(output, height=7)
-        self.output.grid(row=0, column=0, sticky="nsew")
+        log_frame = ttk.LabelFrame(left, text="Execution log", padding=4)
+        log_frame.grid(row=2, column=0, sticky="nsew")
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.log = ExecutionLog(log_frame)
+        self.log.grid(row=0, column=0, sticky="nsew")
 
-        memory_frame = ttk.LabelFrame(body, text="Data memory (dmem) - Double-click to edit", padding=4)
+        memory_frame = ttk.LabelFrame(body, text="Memory", padding=4)
         memory_frame.rowconfigure(0, weight=1)
         memory_frame.columnconfigure(0, weight=1)
         body.add(memory_frame, weight=2)
         self.memory = MemoryView(memory_frame, cpu=self.cpu)
         self.memory.grid(row=0, column=0, sticky="nsew")
-
-        right = ttk.Frame(body, padding=(6, 0, 0, 0))
-        right.rowconfigure(0, weight=1)
-        right.columnconfigure(0, weight=1)
-        body.add(right, weight=1)
-        log_frame = ttk.LabelFrame(right, text="Execution log", padding=4)
-        log_frame.grid(row=0, column=0, sticky="nsew")
-        log_frame.rowconfigure(0, weight=1)
-        log_frame.columnconfigure(0, weight=1)
-        self.log = ExecutionLog(log_frame)
-        self.log.grid(row=0, column=0, sticky="nsew")
 
     @staticmethod
     def _state_row(parent: ttk.LabelFrame, row: int, name: str, variable: tk.StringVar):
@@ -155,18 +145,6 @@ class App(tk.Tk):
         ]
         self.memory.refresh(state["dmem"], changed)
         self._last_memory = state["dmem"]
-        self._refresh_output(state["dmem"])
-
-    def _refresh_output(self, memory: list[int]) -> None:
-        # These are the result locations defined by the project contract.  It
-        # is useful to show them even when a program has not been loaded yet.
-        lines = [
-            f"dmem[0x200] = {to_hex(memory[0x200])} ({memory[0x200]})  (maximum)",
-            f"dmem[0x300] = {to_hex(memory[0x300])} ({memory[0x300]})  (convolution low)",
-            f"dmem[0x301] = {to_hex(memory[0x301])} ({memory[0x301]})  (convolution middle)",
-            f"dmem[0x302] = {to_hex(memory[0x302])} ({memory[0x302]})  (convolution high)",
-        ]
-        self.output.set_lines(lines)
 
     def _log_instruction(self, instruction: DecodedInstruction) -> None:
         self.log.append(
@@ -268,10 +246,30 @@ class App(tk.Tk):
         self.status_var.set(f"Loaded {Path(path).name}")
         self._refresh()
 
+    def load_mem(self) -> None:
+        """Load memory from a .mem file."""
+        path = filedialog.askopenfilename(
+            title="Load memory file",
+            filetypes=(("Memory files", "*.mem"), ("All files", "*.*")),
+        )
+        if not path:
+            return
+        
+        try:
+            # Use CPU's load_mem_file method
+            count = self.cpu.load_mem_file(path)
+            self.log.append(f"Loaded {Path(path).name} ({count} values)")
+            self.status_var.set(f"Loaded {Path(path).name}")
+            self._refresh()
+            
+        except CPUError as error:
+            self.status_var.set(f"Load error: {error}")
+            self.log.append(f"LOAD ERROR: {error}")
+            messagebox.showerror("Could not load memory file", str(error), parent=self)
+
     def _close(self) -> None:
         self.stop_run()
         self.destroy()
-
 
 def run(cpu: CPU | None = None) -> None:
     """Launch the GUI and block until its window is closed."""

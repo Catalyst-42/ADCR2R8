@@ -51,14 +51,19 @@ class MemoryView(ttk.Frame):
         self.cpu = cpu
         self.tree = ttk.Treeview(
             self,
-            columns=("address", "value"),
+            columns=("address", "hex", "dec", "char"),
             show="headings",
+            height=16,  # Make it taller
             selectmode="browse",
         )
         self.tree.heading("address", text="Address")
-        self.tree.heading("value", text="Value (Hex | Decimal)")
-        self.tree.column("address", width=100, anchor="w", stretch=False)
-        self.tree.column("value", width=150, anchor="e", stretch=True)
+        self.tree.heading("hex", text="Hex")
+        self.tree.heading("dec", text="Decimal")
+        self.tree.heading("char", text="Char")
+        self.tree.column("address", width=70, anchor="e")
+        self.tree.column("hex", width=70, anchor="e")
+        self.tree.column("dec", width=70, anchor="e")
+        self.tree.column("char", width=50, anchor="center")
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -71,7 +76,7 @@ class MemoryView(ttk.Frame):
 
         for address in range(4096):
             self.tree.insert(
-                "", "end", iid=str(address), values=(to_hex(address, 3), "0x0000 | 0")
+                "", "end", iid=str(address), values=(to_hex(address, 3), "0x0000", "0", "")
             )
 
     def _on_double_click(self, event):
@@ -97,7 +102,7 @@ class MemoryView(ttk.Frame):
         input_frame.pack(fill="both", expand=True)
         
         ttk.Label(input_frame, text=f"Address: {to_hex(address, 3)}").pack(anchor="w", pady=(0, 5))
-        ttk.Label(input_frame, text=f"Current: 0x{current_value:04X} | {current_value}").pack(anchor="w", pady=(0, 10))
+        ttk.Label(input_frame, text=f"Current: 0x{current_value:04X} | {current_value} | {self._get_character_representation(current_value)}").pack(anchor="w", pady=(0, 10))
         
         # Entry for new value
         value_var = tk.StringVar(value=f"0x{current_value:04X}")
@@ -124,11 +129,11 @@ class MemoryView(ttk.Frame):
                 
                 # Refresh display - update only the edited address
                 hex_value = to_hex(new_value)
-                decimal_value = new_value
-                display_value = f"{hex_value} | {decimal_value}"
+                decimal_value = str(new_value)
+                char_value = self._get_character_representation(new_value)
                 self.tree.item(
                     str(address),
-                    values=(to_hex(address, 3), display_value),
+                    values=(to_hex(address, 3), hex_value, decimal_value, char_value),
                 )
                 
                 dialog.destroy()
@@ -145,6 +150,13 @@ class MemoryView(ttk.Frame):
         # Bind Enter key
         entry.bind("<Return>", lambda e: save_value())
 
+    def _get_character_representation(self, value: int) -> str:
+        """Get character representation for a memory value."""
+        if 32 <= value <= 126:  # Printable ASCII range
+            return chr(value)
+        else:
+            return ""  # Empty for non-printable characters
+
     def refresh(
         self, memory: Sequence[int], addresses: Sequence[int] | None = None
     ) -> None:
@@ -157,11 +169,11 @@ class MemoryView(ttk.Frame):
         for address in selected:
             if 0 <= address < len(memory) and address < 4096:
                 hex_value = to_hex(memory[address])
-                decimal_value = memory[address]
-                display_value = f"{hex_value} | {decimal_value}"
+                decimal_value = str(memory[address])
+                char_value = self._get_character_representation(memory[address])
                 self.tree.item(
                     str(address),
-                    values=(to_hex(address, 3), display_value),
+                    values=(to_hex(address, 3), hex_value, decimal_value, char_value),
                 )
 
     def show_address(self, address: int) -> None:

@@ -257,3 +257,53 @@ class CPU:
             self.step()
             steps += 1
         return steps
+
+    def load_mem_file(self, file_path: str) -> None:
+        """Load memory data from a .mem file.
+        
+        Format: address:value pairs (supports hex/decimal, ignores ; comments)
+        Example:
+        0x0001:6
+        0x0002:10    ; comment
+        0x0003:20
+        0x0004:A     ; character values will be converted to ord()
+        """
+        data = {}
+        try:
+            with open(file_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith(';'):
+                        # Remove comments after ;
+                        if ';' in line:
+                            line = line.split(';')[0].strip()
+                        
+                        # Parse address:value format
+                        if ':' in line:
+                            addr_str, val_str = line.split(':', 1)
+                            address = int(addr_str.strip(), 0)  # Handle 0x prefix
+                            # Clean value string (remove remaining comments and spaces)
+                            val_clean = val_str.strip()
+                            
+                            if val_clean:
+                                # Check if it's a single character (no quotes needed)
+                                if len(val_clean) == 1 and val_clean.isprintable():
+                                    # Convert character to ord() value
+                                    value = ord(val_clean)
+                                else:
+                                    # Parse as regular number (remove any trailing comments)
+                                    val_num = val_clean.split()[0] if ' ' in val_clean else val_clean
+                                    value = int(val_num, 0)
+                                data[address] = value
+            
+            # Load data into CPU memory
+            for address, value in data.items():
+                if 0 <= address < len(self.dmem):
+                    self.dmem[address] = value
+                else:
+                    raise CPUError(f'Address {address} exceeds memory size')
+                    
+        except (ValueError, OSError) as error:
+            raise CPUError(f'Failed to load .mem file {file_path}: {error}')
+        
+        return len(data)
