@@ -30,7 +30,7 @@ class App(tk.Tk):
         self._after_id: str | None = None
         self._last_memory: list[int] | None = None
 
-        self.title("ADCR2R8 — CPU emulator")
+        self.title("ADCR2R8 - CPU emulator")
         self.geometry("1100x720")
         self.minsize(850, 520)
         self.protocol("WM_DELETE_WINDOW", self._close)
@@ -99,11 +99,11 @@ class App(tk.Tk):
         self.output = HexView(output, height=7)
         self.output.grid(row=0, column=0, sticky="nsew")
 
-        memory_frame = ttk.LabelFrame(body, text="Data memory (dmem)", padding=4)
+        memory_frame = ttk.LabelFrame(body, text="Data memory (dmem) - Double-click to edit", padding=4)
         memory_frame.rowconfigure(0, weight=1)
         memory_frame.columnconfigure(0, weight=1)
         body.add(memory_frame, weight=2)
-        self.memory = MemoryView(memory_frame)
+        self.memory = MemoryView(memory_frame, cpu=self.cpu)
         self.memory.grid(row=0, column=0, sticky="nsew")
 
         right = ttk.Frame(body, padding=(6, 0, 0, 0))
@@ -161,10 +161,10 @@ class App(tk.Tk):
         # These are the result locations defined by the project contract.  It
         # is useful to show them even when a program has not been loaded yet.
         lines = [
-            f"dmem[0x200] = {to_hex(memory[0x200])}  (maximum)",
-            f"dmem[0x300] = {to_hex(memory[0x300])}  (convolution low)",
-            f"dmem[0x301] = {to_hex(memory[0x301])}  (convolution middle)",
-            f"dmem[0x302] = {to_hex(memory[0x302])}  (convolution high)",
+            f"dmem[0x200] = {to_hex(memory[0x200])} ({memory[0x200]})  (maximum)",
+            f"dmem[0x300] = {to_hex(memory[0x300])} ({memory[0x300]})  (convolution low)",
+            f"dmem[0x301] = {to_hex(memory[0x301])} ({memory[0x301]})  (convolution middle)",
+            f"dmem[0x302] = {to_hex(memory[0x302])} ({memory[0x302]})  (convolution high)",
         ]
         self.output.set_lines(lines)
 

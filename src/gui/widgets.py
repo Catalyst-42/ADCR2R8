@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Sequence
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from src.gui.formatting import to_hex
 
@@ -44,10 +44,11 @@ class RegisterTable(ttk.Frame):
 
 
 class MemoryView(ttk.Frame):
-    """Scrollable hexadecimal view of a 4096-word memory."""
+    """Scrollable hexadecimal view of a 4096-word memory with editing capabilities."""
 
-    def __init__(self, master: tk.Misc, **kwargs) -> None:
+    def __init__(self, master: tk.Misc, cpu=None, **kwargs) -> None:
         super().__init__(master, **kwargs)
+        self.cpu = cpu
         self.tree = ttk.Treeview(
             self,
             columns=("address", "value"),
@@ -55,9 +56,9 @@ class MemoryView(ttk.Frame):
             selectmode="browse",
         )
         self.tree.heading("address", text="Address")
-        self.tree.heading("value", text="Value")
+        self.tree.heading("value", text="Value (Hex | Decimal)")
         self.tree.column("address", width=100, anchor="w", stretch=False)
-        self.tree.column("value", width=110, anchor="e", stretch=True)
+        self.tree.column("value", width=150, anchor="e", stretch=True)
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -65,10 +66,84 @@ class MemoryView(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
+        # Bind double-click for editing
+        self.tree.bind("<Double-1>", self._on_double_click)
+
         for address in range(4096):
             self.tree.insert(
-                "", "end", iid=str(address), values=(to_hex(address, 3), to_hex(0))
+                "", "end", iid=str(address), values=(to_hex(address, 3), "0x0000 | 0")
             )
+
+    def _on_double_click(self, event):
+        """Handle double-click to edit memory cell."""
+        if not self.cpu:
+            return
+            
+        item = self.tree.selection()
+        if not item:
+            return
+            
+        address = int(item[0])
+        current_value = self.cpu.dmem[address]
+        
+        # Create edit dialog
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Edit Memory {to_hex(address, 3)}")
+        dialog.geometry("300x150")
+        dialog.resizable(False, False)
+        
+        # Input frame
+        input_frame = ttk.Frame(dialog, padding="10")
+        input_frame.pack(fill="both", expand=True)
+        
+        ttk.Label(input_frame, text=f"Address: {to_hex(address, 3)}").pack(anchor="w", pady=(0, 5))
+        ttk.Label(input_frame, text=f"Current: 0x{current_value:04X} | {current_value}").pack(anchor="w", pady=(0, 10))
+        
+        # Entry for new value
+        value_var = tk.StringVar(value=f"0x{current_value:04X}")
+        entry = ttk.Entry(input_frame, textvariable=value_var, width=20)
+        entry.pack(pady=(0, 10))
+        entry.select_range(0, tk.END)
+        entry.focus()
+        
+        def save_value():
+            try:
+                input_value = value_var.get().strip()
+                if input_value.startswith("0x") or input_value.startswith("0X"):
+                    # Parse as hex
+                    new_value = int(input_value, 16)
+                else:
+                    # Parse as decimal
+                    new_value = int(input_value)
+                
+                # Clamp to 16-bit unsigned
+                new_value = max(0, min(new_value, 0xFFFF))
+                
+                # Update CPU memory
+                self.cpu.dmem[address] = new_value
+                
+                # Refresh display - update only the edited address
+                hex_value = to_hex(new_value)
+                decimal_value = new_value
+                display_value = f"{hex_value} | {decimal_value}"
+                self.tree.item(
+                    str(address),
+                    values=(to_hex(address, 3), display_value),
+                )
+                
+                dialog.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Value", "Please enter a valid hexadecimal or decimal number (0-65535)", parent=dialog)
+        
+        # Buttons
+        button_frame = ttk.Frame(input_frame)
+        button_frame.pack(fill="x")
+        
+        ttk.Button(button_frame, text="Save", command=save_value).pack(side="right", padx=(5, 0))
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side="right")
+        
+        # Bind Enter key
+        entry.bind("<Return>", lambda e: save_value())
 
     def refresh(
         self, memory: Sequence[int], addresses: Sequence[int] | None = None
@@ -81,9 +156,12 @@ class MemoryView(ttk.Frame):
         selected = range(min(len(memory), 4096)) if addresses is None else addresses
         for address in selected:
             if 0 <= address < len(memory) and address < 4096:
+                hex_value = to_hex(memory[address])
+                decimal_value = memory[address]
+                display_value = f"{hex_value} | {decimal_value}"
                 self.tree.item(
                     str(address),
-                    values=(to_hex(address, 3), to_hex(memory[address])),
+                    values=(to_hex(address, 3), display_value),
                 )
 
     def show_address(self, address: int) -> None:

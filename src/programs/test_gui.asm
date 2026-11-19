@@ -11,11 +11,11 @@
 
         MOV  R1, #5          ; R1 = 5
         MOV  R2, #7          ; R2 = 7
-        ADD  R1, R2           ; R1 = 12
+        ADD  R1, R2          ; R1 = 12
         STORE [0x350], R1    ; save the result to data memory
         LOAD  R3, [0x350]    ; load it back into R3
-        CMP   R3, #12         ; ZF = 1 when the result is correct
-        JNZ   fail            ; go to fail if the result is not 12
+        CMP   R3, #12        ; ZF = 1 when the result is correct
+        JNZ   fail           ; go to fail if the result is not 12
         MOV   R4, #0x1234
         STORE [0x351], R4    ; success marker
         HALT
