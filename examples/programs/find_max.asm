@@ -38,4 +38,4 @@ skip:
 
 done:
     STORE [0x0000], R3      ; Dump maximum value from R3 to answer memory slot
-    HALT                    ; Done
+    HALT
