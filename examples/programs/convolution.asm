@@ -16,30 +16,30 @@
 ; R5 - Pointer to array A
 ; R6 - Pointer to array B
 
-MOV  R0, #0
+MOV  R0, #0                 ; Init answer with zero
 MOV  R1, #0
 MOV  R2, #0
-MOV  R5, #0x0003
+MOV  R5, #0x0003            ; Init pointers
 MOV  R6, #0x0009
 
 loop:
-    CMP  R5, #0x0009
-        JZ   done
+    CMP  R5, #0x0009        ; If pointer of A reach the begin of B
+        JZ   done           ; Then we are done
 
-    LOAD R3, [R5]
+    LOAD R3, [R5]           ; Get A[R5] and B[R6] for multiplication
     LOAD R4, [R6]
 
-    MUL  R3, R4
-    ADD  R2, R3
+    MUL  R3, R4             ; Multiply values
+    ADD  R2, R3             ; Sum up product with account of carry
     ADC  R1, R4
     ADC  R0, #0
 
-    INC  R5
+    INC  R5                 ; Move pointers step next
     INC  R6
     JMP  loop
 
 done:
-    STORE [0x0000], R0
+    STORE [0x0000], R0      ; Dump sum of products to memory
     STORE [0x0001], R1
     STORE [0x0002], R2
     HALT

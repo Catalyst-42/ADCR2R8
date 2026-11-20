@@ -5,7 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 from src.assembler.errors import AsmError
 from src.assembler.parser import assemble_file
 from src.cpu.cpu import CPU, CPUError, DecodedInstruction
-from src.gui.formatting import to_hex
+from gui.utils import to_hex
 from src.gui.widgets import ExecutionLog, MemoryView, ProgramCommands, RegisterTable
 
 
