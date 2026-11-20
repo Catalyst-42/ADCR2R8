@@ -2,34 +2,44 @@
 
 ; Memory
 ; 0x0000 - Answer
-; 0x0001 - First value of array A
-; 0x0007 - First value of array B
+; 0x0001 - Answer
+; 0x0002 - Answer
+; 0x0003 - First value of array A
+; 0x0009 - First value of array B
 
 ; Registers
-; R0 - Result
-; R1 - Index for array A
-; R2 - Index for array B
-; R3 - A[R1]
-; R4 - B[R2]
+; R0 - High part of result
+; R1 - Mid part of result
+; R2 - Low part of result
+; R3 - Product
+; R4 - Product
+; R5 - Pointer to array A
+; R6 - Pointer to array B
 
-MOV  R0, #0                 ; Init zero result
-MOV  R1, #0x0001            ; Set R1 point to A[0]
-MOV  R2, #0x0007            ; Set R2 point to B[0]
+MOV  R0, #0
+MOV  R1, #0
+MOV  R2, #0
+MOV  R5, #0x0003
+MOV  R6, #0x0009
 
 loop:
-    CMP  R1, #0x0007        ; If we got begin of array B on index of A
-        JZ   done           ; Then we are done
+    CMP  R5, #0x0009
+        JZ   done
 
-    LOAD R3, [R1]           ; Load A[R1]
-    LOAD R4, [R2]           ; Load B[R2]
+    LOAD R3, [R5]
+    LOAD R4, [R6]
 
-    MUL  R3, R4             ; Multiply A[i] * B[i]
-    ADD  R0, R3             ; Sum product with result
+    MUL  R3, R4
+    ADD  R2, R3
+    ADC  R1, R4
+    ADC  R0, #0
 
-    INC  R1                 ; Bump pointers and loop once again
-    INC  R2
+    INC  R5
+    INC  R6
     JMP  loop
 
 done:
-    STORE [0x0000], R0      ; Dump sum of products to answer memory slot
+    STORE [0x0000], R0
+    STORE [0x0001], R1
+    STORE [0x0002], R2
     HALT
