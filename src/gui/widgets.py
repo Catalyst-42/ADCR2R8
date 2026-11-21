@@ -2,7 +2,7 @@ import tkinter as tk
 from collections.abc import Sequence
 from tkinter import messagebox, ttk
 
-from gui.utils import to_hex
+from src.gui.utils import to_hex
 
 
 class RegisterTable(ttk.Frame):

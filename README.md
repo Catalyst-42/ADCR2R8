@@ -1,9 +1,5 @@
 # ADCR2R8
 
-Implemented core and integration contract (Russian): [docs/core.md](docs/core.md).
-
-Run headless examples: `python -m src.cpu.demo`
-
 Run tests (no dependencies): `python -m unittest discover -s tests -v`
 
 GUI is currently a placeholder.
