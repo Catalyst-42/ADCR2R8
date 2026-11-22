@@ -264,8 +264,13 @@ class ProgramCommands(ttk.Frame):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        for address, instruction in enumerate(program_memory):
+        address = 0
+        while address < len(program_memory):
+            instruction = program_memory[address]
+            length = 1
+
             if instruction == 0:
+                address += 1
                 continue
 
             address_str = to_hex(address, 3)
@@ -275,6 +280,7 @@ class ProgramCommands(ttk.Frame):
                 try:
                     decoded = self.cpu.decode(address)
                     instruction_str = decoded.assembly
+                    length = decoded.length
                 except:
                     instruction_str = code_str
             else:
@@ -286,3 +292,4 @@ class ProgramCommands(ttk.Frame):
                 iid=str(address),
                 values=(address_str, code_str, instruction_str),
             )
+            address += length
