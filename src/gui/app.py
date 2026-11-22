@@ -308,13 +308,3 @@ class App(tk.Tk):
 
     def _close(self) -> None:
         self.destroy()
-
-
-def run(cpu: CPU | None = None) -> None:
-    """Run button"""
-    app = App(cpu or CPU())
-    app.mainloop()
-
-
-if __name__ == "__main__":
-    run()

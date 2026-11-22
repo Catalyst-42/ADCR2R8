@@ -1,5 +1,5 @@
 from src.cpu.cpu import CPU
-from src.gui.app import run as run_gui
+from src.gui.app import App
 
-cpu = CPU()
-run_gui(cpu)
+app = App(CPU())
+app.mainloop()

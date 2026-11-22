@@ -1,205 +1,99 @@
 # ADCR2R8
+A 16-bit Harvard architecture CPU emulator written in Python with a Tkinter GUI. Includes an assembler, parser and example programs.
 
-Run tests (no dependencies): `python -m unittest discover -s tests -v`
+![Emulator](<img/ADCR2R8 - Emulator.png>)
 
-GUI is currently a placeholder.
+## Architecture
+Harvard architecture with separate instruction and data memory. Both memories are arrays of 4096 16-bit words. Instructions have variable length from one to two words.
 
-## General Information
+Registers:
+- PC - Program counter
+- IR - Instruction register
+- ZF - Zero flag
+- CF - Carry flag
+- SF - Sign flag
 
-- Architecture: Harvard (separate imem and dmem)
-- Addressability: two-address
-- Word size: 16 bits
-- General purpose registers: 16 (R0-R15), 16 bits each
-- Language: Python
-- GUI: tkinter
-- Program input: .asm file via parser
+Also CPU provides 16 general purpose registers.
 
-## Task
+## Command format
+Every instruction starts with one 16-bit word.
 
-- Task 1: find maximum in an array
-- Task 2: convolution of two arrays, 6 elements, unsigned numbers
+```text
+0000 0000 0000 0000
+   │    │    │   │
+   │    │    │   └─── Addressing mode  [3:0]
+   │    │    └─────── Source           [7:4]
+   │    └──────────── Destination      [11:8]
+   └───────────────── Opcode           [15:12]
+```
 
-## Command Format
+## Addressing modes
+```text
+0   Register           ADD R1, R2
+1   Immediate          MOV R5, #100
+2   Direct             LOAD R3, [0x100]
+3   Indirect register  LOAD R3, [R2]
+```
 
-    [15:12] [11:8] [7:4] [3:0]
-    opcode   Rd     Rs    mode
+- Mode 0 - Register, second operand is taken directly from the source
+- Mode 1 - Immediate, second word is a raw number
+- Mode 2 - Direct, second word is a memory address
+- Mode 3 - Indirect register, source register holds a memory address
 
-- mode = 0 or 3: command takes 1 word
-- mode = 1 or 2: command takes 2 words (second word is number or address)
+## Opcodes
+Table shows explicit input and output operands for each instruction.
 
-### Jumps (separate format)
+|  Opcode  |  Hex  |     Format      |             Operation              |
+| -------- | ----- | --------------- | ---------------------------------- |
+| `MOV`    | `0x0` | `<out>, <in>`   | `<out>        = <in>`              |
+| `LOAD`   | `0x1` | `<out>, [addr]` | `<out>        = memory[addr]`      |
+| `STORE`  | `0x2` | `[addr], <in>`  | `memory[addr] = <in>`              |
+| `ADD`    | `0x3` | `<out>, <in>`   | `<out>        = <out> + <in>`      |
+| `ADC`    | `0x4` | `<out>, <in>`   | `<out>        = <out> + <in> + CF` |
+| `SUB`    | `0x5` | `<out>, <in>`   | `<out>        = <out> - <in>`      |
+| `SBB`    | `0x6` | `<out>, <in>`   | `<out>        = <out> - <in> - CF` |
+| `MUL`    | `0x7` | `<out>, <in>`   | `<out:out+1>  = <out> * <in>`      |
+| `DIV`    | `0x8` | `<out>, <in>`   | `<out>        = <out> / <in>`      |
+| `INC`    | `0x9` | `<out>`         | `<out>        = <out> + 1`         |
+| `DEC`    | `0xA` | `<out>`         | `<out>        = <out> - 1`         |
+| `CMP`    | `0xB` | `<in1>, <in2>`  | `flags        = <in1> - <in2>`     |
+| `AND`    | `0xC` | `<out>, <in>`   | `<out>        = <out> & <in>`      |
+| `OR`     | `0xD` | `<out>, <in>`   | `<out>        = <out> \| <in>`     |
+| `XOR`    | `0xE` | `<out>, <in>`   | `<out>        = <out> ^ <in>`      |
+| `NOT`    | `0xF` | `<out>`         | `<out>        = ~ <out>`           |
 
-    word 1: 0x00cF (c is the condition code below)
-    word 2: absolute target address, 0..4095
+## Jump conditions
+Instruction threated as jump command when mode is set to `0xF`. There's table of jump types
 
-Jumps take 2 words. HALT is one word: 0x007F.
-This replaces the old ambiguous encoding that collided with data instructions.
-Reassemble old machine-code lists.
+| Instruction |  Hex  | Condition |
+| ----------- | ----- | --------- |
+| JMP         | `0x0` |           |
+| JZ          | `0x1` | `ZF = 1`  |
+| JNZ         | `0x2` | `ZF = 0`  |
+| JC          | `0x3` | `CF = 1`  |
+| JNC         | `0x4` | `CF = 0`  |
+| JS          | `0x5` | `SF = 1`  |
+| JNS         | `0x6` | `SF = 0`  |
+| HALT        | `0x7` |           |
 
-The project retains variable-length instructions; the attached example requirements
-request fixed length. See docs/core.md for this outstanding specification difference.
+## Encoding example
+Let's encode the instruction `ADC R2, R8`.
 
-## Opcode Table
+```text
+opcode      = 0x4  (ADC from table)
+destination = 2    (Register R2)
+source      = 8    (Register R8)
+mode        = 0    (Register addressing)
 
-| Mnemonic | Code | Action             |
-|----------|------|--------------------|
-| MOV      | 0x0  | Rd <- Rs           |
-| LOAD     | 0x1  | Rd <- dmem[...]    |
-| STORE    | 0x2  | dmem[...] <- Rd    |
-| ADD      | 0x3  | Rd <- Rd + Rs      |
-| ADC      | 0x4  | Rd <- Rd + Rs + CF |
-| SUB      | 0x5  | Rd <- Rd - Rs      |
-| SBB      | 0x6  | Rd <- Rd - Rs - CF |
-| MUL      | 0x7  | Rd:Rd+1 <- Rd * Rs |
-| DIV      | 0x8  | Rd <- Rd / Rs      |
-| INC      | 0x9  | Rd <- Rd + 1       |
-| DEC      | 0xA  | Rd <- Rd - 1       |
-| CMP      | 0xB  | flags <- Rd - Rs   |
-| AND      | 0xC  | Rd <- Rd and Rs    |
-| OR       | 0xD  | Rd <- Rd or Rs     |
-| XOR      | 0xE  | Rd <- Rd xor Rs    |
-| NOT      | 0xF  | Rd <- not Rd       |
+word = 0x4000 | 0x0200 | 0x0080 | 0x0000
+word = 0x4280
+```
 
-## Jump Table
+## Usage
+To run GUI simply use `main.py` file: 
 
-| Mnemonic | Code | Condition |
-|----------|------|-----------|
-| JMP      | 0x0  | always    |
-| JZ       | 0x1  | ZF=1      |
-| JNZ      | 0x2  | ZF=0      |
-| JC       | 0x3  | CF=1      |
-| JNC      | 0x4  | CF=0      |
-| JS       | 0x5  | SF=1      |
-| JNS      | 0x6  | SF=0      |
-| HALT     | 0x7  | halt      |
+```python
+python3 main.py
+```
 
-## Addressing Modes
-
-| Code | Name                 | Example          |
-|------|----------------------|------------------|
-| 0    | Register             | ADD R1, R2       |
-| 1    | Immediate            | MOV R5, #100   |
-| 2    | Direct               | LOAD R3, [0x100] |
-| 3    | Indirect register    | LOAD R3, [R2]    |
-
-## Flags
-
-| Flag | = 1 when                      |
-|------|-------------------------------|
-| ZF   | result = 0                    |
-| CF   | carry/borrow from highest bit |
-| SF   | highest bit of result = 1     |
-
-## Assembly Syntax
-
-- Comment: ;
-- Label: loop:
-- Hex: 0x100
-- Immediate: #5
-- Operand separator: comma
-
-## Memory
-
-- imem: list of 4096 numbers
-- dmem: list of 4096 numbers
-- Registers initialized to 0
-- First cell of array holds its size N
-- Array elements start at address start + 1
-- Array A base: 0x100
-- Array B base: 0x200
-- Result of convolution: 0x300 (low word), 0x301 (middle word), 0x302 (high word)
-- Result of maximum: 0x200
-
-## CPU Interface
-
-cpu.step()           # execute one command
-cpu.run(limit=10000) # execute until HALT or limit reached
-cpu.reset()          # reset
-cpu.regs             # list [16]
-cpu.imem             # list [N]
-cpu.dmem             # list [N]
-cpu.pc               # program counter
-cpu.ir               # instruction register
-cpu.ZF, cpu.CF, cpu.SF
-
-## Encoding Examples
-
-    ADD R1, R2
-    opcode=3, Rd=1, Rs=2, mode=0
-    0x3120
-
-    MOV R5, #100
-    word 1: opcode=0, Rd=5, Rs=0, mode=1 -> 0x0501
-    word 2: 0x0064
-
-    STORE [0x100], R3
-    word 1: opcode=2, Rd=3, Rs=0, mode=2 -> 0x2302
-    word 2: 0x0100
-
-## Edge Cases
-
-- Division by zero: raise exception
-- MUL carry: low word -> Rd, high word -> Rd+1, CF unchanged
-- After HALT: cpu.halted = True, run() stops
-
-## Output Format
-
-- All values displayed in hex with 0x prefix
-- Example: 0x3120
-
-## Work Division
-
-### CPU core
-
-- fields: imem, dmem, regs[16], pc, ir, ZF, CF, SF
-- step(), run(), reset()
-- decoder via bit shifts
-- handle commands of length 1 and 2 words
-- update flags after arithmetic
-- MUL: Rd = low, Rd+1 = high
-- jumps, HALT
-
-### Parser and programs
-
-Parser:
-
-- read .asm
-- remove comments and empty lines
-- recognize labels
-- split into mnemonic and operands
-- determine mode by operand
-- two passes for labels
-- output array of numbers for imem
-
-Programs:
-
-- find maximum in array
-- convolution of 6 unsigned (MUL + ADC)
-
-### GUI and report
-
-GUI:
-
-- register table (hex)
-- PC, IR (hex + asm), flags
-- data memory with scroll
-- buttons: Step, Run, Reset, Load
-- execution log
-- hex output
-
-Report:
-
-- title page, task
-- architecture description
-- tables (format, codes, modes, registers, flags)
-- two programs: numbers + asm
-- emulator description
-- conclusion
-
-## Dependencies
-
-parser.py -> imem -> cpu.py -> regs/flags -> gui.py
-
-- Parser independent of CPU
-- CPU independent of parser
-- GUI depends on CPU
+It may require additional Tkinter installation depending on OS type. Load `.asm` file of program and additional `.mem` file with working data for program. You can run it until halt or step by step with buttons.
