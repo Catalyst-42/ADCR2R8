@@ -234,8 +234,27 @@ class App(tk.Tk):
     def reset(self) -> None:
         """Rest button"""
         self.cpu.reset()
-
+        self.log.clear()
         self.log.append("CPU reset")
+
+        # Reload program
+        if self._asm_file_path:
+            words = assemble_file(str(self._asm_file_path))
+            self.cpu.load_program(words)
+
+            self.log.append(
+                f"Reloaded {Path(self._asm_file_path).name} ({len(words)} words)"
+            )
+
+        # Reload memory
+        if self._mem_file_path:
+            self.cpu.dmem[:] = [0] * len(self.cpu.dmem)
+            count = self.cpu.load_mem_file(self._mem_file_path)
+
+            self.log.append(
+                f"Reloaded {Path(self._mem_file_path).name} ({count} values)"
+            )
+
         self._refresh()
 
     def load_asm(self) -> None:
@@ -280,9 +299,7 @@ class App(tk.Tk):
             self.cpu.dmem[:] = [0] * len(self.cpu.dmem)
 
             count = self.cpu.load_mem_file(path)
-            self.log.append(
-                f"Loaded {Path(path).name} ({count} values)"
-            )
+            self.log.append(f"Loaded {Path(path).name} ({count} values)")
             self._refresh()
 
         except CPUError as error:

@@ -217,6 +217,12 @@ class ExecutionLog(ttk.Frame):
         self.text.see("end")
         self.text.configure(state="disabled")
 
+    def clear(self) -> None:
+        """Clears all log messages"""
+        self.text.configure(state="normal")
+        self.text.delete(1.0, tk.END)
+        self.text.configure(state="disabled")
+
 
 class ProgramCommands(ttk.Frame):
     def __init__(self, master: tk.Misc, cpu=None, **kwargs) -> None:
