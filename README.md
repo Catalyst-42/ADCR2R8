@@ -20,8 +20,8 @@ Every instruction starts with one 16-bit word.
 
 ```text
 0000 0000 0000 0000
-   │    │    │   │
-   │    │    │   └─── Addressing mode  [3:0]
+   │    │    │    │
+   │    │    │    └── Addressing mode  [3:0]
    │    │    └─────── Source           [7:4]
    │    └──────────── Destination      [11:8]
    └───────────────── Opcode           [15:12]
@@ -43,38 +43,38 @@ Every instruction starts with one 16-bit word.
 ## Opcodes
 Table shows explicit input and output operands for each instruction.
 
-|  Opcode  |  Hex  |     Format      |             Operation              |
-| -------- | ----- | --------------- | ---------------------------------- |
-| `MOV`    | `0x0` | `<out>, <in>`   | `<out>        = <in>`              |
-| `LOAD`   | `0x1` | `<out>, [addr]` | `<out>        = memory[addr]`      |
-| `STORE`  | `0x2` | `[addr], <in>`  | `memory[addr] = <in>`              |
-| `ADD`    | `0x3` | `<out>, <in>`   | `<out>        = <out> + <in>`      |
-| `ADC`    | `0x4` | `<out>, <in>`   | `<out>        = <out> + <in> + CF` |
-| `SUB`    | `0x5` | `<out>, <in>`   | `<out>        = <out> - <in>`      |
-| `SBB`    | `0x6` | `<out>, <in>`   | `<out>        = <out> - <in> - CF` |
-| `MUL`    | `0x7` | `<out>, <in>`   | `<out:out+1>  = <out> * <in>`      |
-| `DIV`    | `0x8` | `<out>, <in>`   | `<out>        = <out> / <in>`      |
-| `INC`    | `0x9` | `<out>`         | `<out>        = <out> + 1`         |
-| `DEC`    | `0xA` | `<out>`         | `<out>        = <out> - 1`         |
-| `CMP`    | `0xB` | `<in1>, <in2>`  | `flags        = <in1> - <in2>`     |
-| `AND`    | `0xC` | `<out>, <in>`   | `<out>        = <out> & <in>`      |
-| `OR`     | `0xD` | `<out>, <in>`   | `<out>        = <out> \| <in>`     |
-| `XOR`    | `0xE` | `<out>, <in>`   | `<out>        = <out> ^ <in>`      |
-| `NOT`    | `0xF` | `<out>`         | `<out>        = ~ <out>`           |
+| Opcode | Hex |     Format      |             Operation              |
+| ------ | --- | --------------- | ---------------------------------- |
+| MOV    | 0x0 | `<out>, <in>`   | `<out>        = <in>`              |
+| LOAD   | 0x1 | `<out>, [addr]` | `<out>        = memory[addr]`      |
+| STORE  | 0x2 | `[addr], <in>`  | `memory[addr] = <in>`              |
+| ADD    | 0x3 | `<out>, <in>`   | `<out>        = <out> + <in>`      |
+| ADC    | 0x4 | `<out>, <in>`   | `<out>        = <out> + <in> + CF` |
+| SUB    | 0x5 | `<out>, <in>`   | `<out>        = <out> - <in>`      |
+| SBB    | 0x6 | `<out>, <in>`   | `<out>        = <out> - <in> - CF` |
+| MUL    | 0x7 | `<out>, <in>`   | `<out:out+1>  = <out> * <in>`      |
+| DIV    | 0x8 | `<out>, <in>`   | `<out>        = <out> / <in>`      |
+| INC    | 0x9 | `<out>`         | `<out>        = <out> + 1`         |
+| DEC    | 0xA | `<out>`         | `<out>        = <out> - 1`         |
+| CMP    | 0xB | `<in1>, <in2>`  | `flags        = <in1> - <in2>`     |
+| AND    | 0xC | `<out>, <in>`   | `<out>        = <out> & <in>`      |
+| OR     | 0xD | `<out>, <in>`   | `<out>        = <out> \| <in>`     |
+| XOR    | 0xE | `<out>, <in>`   | `<out>        = <out> ^ <in>`      |
+| NOT    | 0xF | `<out>`         | `<out>        = ~ <out>`           |
 
 ## Jump conditions
 Instruction threated as jump command when mode is set to `0xF`. There's table of jump types
 
-| Instruction |  Hex  | Condition |
-| ----------- | ----- | --------- |
-| JMP         | `0x0` |           |
-| JZ          | `0x1` | `ZF = 1`  |
-| JNZ         | `0x2` | `ZF = 0`  |
-| JC          | `0x3` | `CF = 1`  |
-| JNC         | `0x4` | `CF = 0`  |
-| JS          | `0x5` | `SF = 1`  |
-| JNS         | `0x6` | `SF = 0`  |
-| HALT        | `0x7` |           |
+| Instruction | Hex | Condition |
+| ----------- | --- | --------- |
+| JMP         | 0x0 |           |
+| JZ          | 0x1 | `ZF = 1`  |
+| JNZ         | 0x2 | `ZF = 0`  |
+| JC          | 0x3 | `CF = 1`  |
+| JNC         | 0x4 | `CF = 0`  |
+| JS          | 0x5 | `SF = 1`  |
+| JNS         | 0x6 | `SF = 0`  |
+| HALT        | 0x7 |           |
 
 ## Encoding example
 Let's encode the instruction `ADC R2, R8`.
